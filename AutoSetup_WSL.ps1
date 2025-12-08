@@ -1,93 +1,115 @@
 # ==========================================
-# Windows WSL + Arch Linux 全自动部署脚本
+# Windows WSL + Arch Linux 全自动部署脚本 (优化版)
 # ==========================================
 
-# 1. 强制管理员权限 (必须放在最前面，否则 DISM 命令无法执行)
+# 1. 强制管理员权限
 if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Host "请右键本脚本 -> 以管理员身份运行！" -ForegroundColor Red
     Read-Host "按 Enter 键退出..."
     Exit
 }
 
-# 颜色定义
-$Green = "Green"
-$Cyan = "Cyan"
-$Yellow = "Yellow"
-$Red = "Red"
-
+$Green = "Green"; $Cyan = "Cyan"; $Yellow = "Yellow"; $Red = "Red"
 Write-Host "=== Arch Linux on WSL 自动化部署工具 ===" -ForegroundColor $Cyan
 
-# 2. [恢复] 检查并开启 Windows 功能 (WSL & 虚拟机平台)
-Write-Host "`n[1/4] 检查 Windows 基础功能..." -ForegroundColor $Green
+# 定义目标发行版名称 (根据你的反馈，我们使用 ArchLinux)
+$TargetDistro = "ArchLinux" 
 
+# 2. 检查并开启 Windows 功能
+Write-Host "`n[1/4] 检查 Windows 基础功能..." -ForegroundColor $Green
 $wslStatus = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
 $vmStatus = Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform
 
 if ($wslStatus.State -ne "Enabled" -or $vmStatus.State -ne "Enabled") {
-    Write-Host ">>> 检测到 WSL 或 虚拟机平台 未开启，正在自动开启..." -ForegroundColor $Yellow
-    dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
-    dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
-    
-    Write-Host "`n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor $Red
-    Write-Host "   警告：Windows 功能已开启，必须重启电脑才能生效！" -ForegroundColor $Red
-    Write-Host "   PLEASE RESTART YOUR COMPUTER NOW." -ForegroundColor $Red
-    Write-Host "   重启后，请再次双击运行此脚本继续安装 Arch。" -ForegroundColor $Red
-    Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor $Red
-    
-    Write-Host "`n按任意键退出并准备重启..."
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    exit
-} else {
-    Write-Host ">>> Windows 功能已就绪。" -ForegroundColor $Green
+    Write-Host ">>> 正在开启 WSL 和 虚拟机平台..." -ForegroundColor $Yellow
+    dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart | Out-Null
+    dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart | Out-Null
+    Write-Host "`n[严重警告] 功能已开启，必须重启电脑！" -ForegroundColor $Red
+    Write-Host "请重启后再次运行此脚本。" -ForegroundColor $Red
+    Read-Host "按 Enter 键重启 (或关闭窗口手动重启)..."
+    Restart-Computer
+    Exit
 }
 
-# 3. 更新 WSL 内核并设置默认版本为 2
-Write-Host "`n[2/4] 配置 WSL 版本..." -ForegroundColor $Green
-Write-Host ">>> 更新 WSL 内核..."
-# 捕获可能的更新错误（防止网络问题中断脚本）
-try { wsl --update } catch { Write-Host "更新跳过或失败，尝试继续..." -ForegroundColor Gray }
-Write-Host ">>> 设置 WSL 2 为默认版本..."
+# 3. 配置 WSL 版本
+Write-Host "`n[2/4] 配置 WSL 默认版本为 2..." -ForegroundColor $Green
+try { wsl --update } catch { } # 尝试更新，失败忽略
 wsl --set-default-version 2
 
-# 4. [修改] 使用微软官方命令安装 Arch
-Write-Host "`n[3/4] 正在安装 Arch Linux..." -ForegroundColor $Green
+# 4. 安装 Arch Linux
+Write-Host "`n[3/4] 正在通过微软官方源安装 $TargetDistro ..." -ForegroundColor $Green
 
-# 检查是否已经存在
-if (wsl --list --quiet | Select-String "Arch") {
-    Write-Host ">>> 检测到 Arch 似乎已经安装。" -ForegroundColor $Yellow
+# 检测是否已存在（模糊匹配）
+$existing = wsl --list --quiet | Select-String "Arch"
+if ($existing) {
+    Write-Host ">>> 检测到 Arch 似乎已经安装，跳过安装步骤。" -ForegroundColor $Yellow
 } else {
-    Write-Host ">>> 正在执行 wsl --install -d Arch ..." -ForegroundColor $Cyan
+    Write-Host ">>> 执行安装命令 (如下载慢请挂梯子)..." -ForegroundColor $Cyan
     try {
-        wsl --install -d archlinux
+        # 关键：这里执行安装。
+        # 注意：这通常会弹出一个新窗口进行初始化。
+        wsl --install -d $TargetDistro
     } catch {
-        Write-Host "安装命令报错！" -ForegroundColor $Red
-        Read-Host "按 Enter 键退出查看错误..."
+        Write-Host "安装命令执行出错：$_" -ForegroundColor $Red
+        Read-Host "按 Enter 退出..."
         Exit
     }
 }
 
-# 5. 引导用户运行 Linux 内部脚本
-Write-Host "`n[4/4] 准备就绪！" -ForegroundColor $Green
-Write-Host "--------------------------------------------------------" -ForegroundColor $Cyan
-Write-Host "Arch Linux 终端即将打开。" -ForegroundColor $Cyan
-Write-Host "请在打开的窗口出现 [root@...] 后，粘贴你的一键神咒：" -ForegroundColor $Yellow
-Write-Host "--------------------------------------------------------"
+# 5. 智能引导与启动 (你提到的重点优化部分)
+Write-Host "`n[4/4] 环境后处理与启动..." -ForegroundColor $Green
 
-# 你的原版神咒 (既然官方包自带 Keyring 配置，这里用回你原来的命令)
+# --- 逻辑优化：循环等待直到系统识别到发行版 ---
+Write-Host ">>> 正在等待 WSL 注册完成..." -NoNewline
+$maxRetries = 30
+$detectedName = ""
+for ($i = 0; $i -lt $maxRetries; $i++) {
+    # 获取真实的发行版名称（防止是 ArchLinux 或者是 Arch）
+    $list = wsl --list --quiet
+    if ($list -match "(?i)Arch") { 
+        # 提取匹配到的确切名称
+        $detectedName = $list | Select-String "(?i)Arch" | Select-Object -First 1
+        $detectedName = $detectedName.ToString().Trim() -replace "`0","" # 清洗字符
+        Write-Host " [成功: $detectedName]" -ForegroundColor $Green
+        break 
+    }
+    Start-Sleep -Seconds 2
+    Write-Host "." -NoNewline
+}
+
+if (-not $detectedName) {
+    Write-Host "`n[错误] 安装看似完成了，但系统列表中找不到 Arch。" -ForegroundColor $Red
+    Write-Host "请尝试手动运行 'wsl -d ArchLinux' 看看是否成功。"
+    Read-Host "按 Enter 退出..."
+    Exit
+}
+
+# 准备神咒
 $godCommand = "pacman -Sy --noconfirm curl && bash <(curl -sL https://raw.githubusercontent.com/iris-Neko/Arch-WSL-One-Click/refs/heads/main/git_setup.sh)"
 
-Write-Host $godCommand -ForegroundColor White -BackgroundColor DarkBlue
+Write-Host "`n--------------------------------------------------------" -ForegroundColor $Cyan
+Write-Host "Arch Linux 即将启动！" -ForegroundColor $Cyan
+Write-Host "请在 Linux 窗口出现 [root@...] 或 [$detectedName] 后，粘贴以下命令：" -ForegroundColor $Yellow
 Write-Host "--------------------------------------------------------"
-Set-Clipboard -Value $godCommand
-Write-Host "(已自动复制到剪贴板，直接在 Arch 窗口里点右键粘贴即可)" -ForegroundColor $Green
+Write-Host $godCommand -ForegroundColor Green -BackgroundColor Black
+Write-Host "--------------------------------------------------------"
 
-Write-Host "`n按任意键启动 Arch..."
+# 写入剪贴板
+try {
+    Set-Clipboard -Value $godCommand
+    Write-Host "(已自动复制到剪贴板，在黑窗口里 [右键] 即可粘贴)" -ForegroundColor $Green
+} catch {
+    Write-Host "(自动复制失败，请手动复制上面的命令)" -ForegroundColor $Red
+}
+
+# 清理缓冲区防止误触
+while ($Host.UI.RawUI.KeyAvailable) { $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") }
+
+Write-Host "`n>>> 按任意键，将在新窗口启动 $detectedName ..."
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
-# 启动 Arch (尝试用 wsl 命令启动，比调用 exe 更通用)
-wsl -d archlinux
+# 使用 Start-Process 显式打开新窗口，确保和当前脚本分离
+Start-Process wsl.exe -ArgumentList "-d $detectedName"
 
-# 防止窗口一闪而过
-Write-Host "`n=========================="
-Write-Host "脚本运行结束。"
-Read-Host -Prompt "按 Enter 键退出..."
+Write-Host "`n脚本运行结束。"
+Start-Sleep -Seconds 3
