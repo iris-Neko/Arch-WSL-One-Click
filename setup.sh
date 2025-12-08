@@ -21,34 +21,67 @@ fi
 
 # ==========================================
 # 0. 提前获取用户输入 (Early Input)
-# ==========================================
+
 echo -e "${BLUE}>>> Pre-configuration: Setup User Credentials${NC}"
-echo "为了实现自动化安装，请先设置将要创建的用户名和密码。"
 
-while true; do
-    read -p "请输入用户名 (Enter username): " NEW_USER
-    if [[ -z "$NEW_USER" ]]; then
-        echo -e "${RED}用户名不能为空，请重试。${NC}"
-        continue
-    fi
-    
-    if id "$NEW_USER" &>/dev/null; then
-        echo -e "${RED}用户 $NEW_USER 已存在。脚本将跳过创建，但为了安全请确认你已知晓密码。${NC}"
-        break
-    fi
-    
-    # 密码输入 (使用 -s 隐藏输入)
-    read -s -p "请输入密码 (Enter password): " NEW_PASS
-    echo ""
-    read -s -p "请再次输入密码 (Confirm password): " NEW_PASS_CONFIRM
-    echo ""
+# --- 尝试 1: 从文件自动读取 (PowerShell 生成) ---
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+CRED_FILE="$SCRIPT_DIR/wsl_cred.txt"
+AUTO_LOAD_SUCCESS=false
 
-    if [ "$NEW_PASS" == "$NEW_PASS_CONFIRM" ] && [ ! -z "$NEW_PASS" ]; then
-        break
+if [ -f "$CRED_FILE" ]; then
+    echo -e "${BLUE}检测到自动配置文件，正在解析...${NC}"
+    # 清洗 CRLF 换行符并读取第一行
+    CRED_LINE=$(head -n 1 "$CRED_FILE" | tr -d '\r')
+    
+    # 解析变量
+    FILE_USER=$(echo "$CRED_LINE" | cut -d':' -f1)
+    FILE_PASS=$(echo "$CRED_LINE" | cut -d':' -f2)
+
+    # 简单验证
+    if [ ! -z "$FILE_USER" ] && [ ! -z "$FILE_PASS" ]; then
+        NEW_USER="$FILE_USER"
+        NEW_PASS="$FILE_PASS"
+        echo -e "${GREEN}成功加载用户凭证: [ $NEW_USER ]${NC}"
+        AUTO_LOAD_SUCCESS=true
+        
+        # 为了安全，读取后删除明文文件
+        rm -f "$CRED_FILE"
     else
-        echo -e "${RED}密码不匹配或为空，请重试。${NC}"
+        echo -e "${RED}配置文件格式无效，转为手动输入模式。${NC}"
     fi
-done
+fi
+
+# --- 尝试 2: 交互式输入 (如果自动读取未成功) ---
+if [ "$AUTO_LOAD_SUCCESS" = false ]; then
+    echo "为了实现自动化安装，请先设置将要创建的用户名和密码。"
+    
+    while true; do
+        read -p "请输入用户名 (Enter username): " NEW_USER
+        if [[ -z "$NEW_USER" ]]; then
+            echo -e "${RED}用户名不能为空，请重试。${NC}"
+            continue
+        fi
+        
+        if id "$NEW_USER" &>/dev/null; then
+            echo -e "${RED}用户 $NEW_USER 已存在。脚本将跳过创建，但为了安全请确认你已知晓密码。${NC}"
+            # 如果用户已存在，通常也需要设置 PASS 变量供后续逻辑使用(比如 sudo 提权验证)，或者直接 break
+            break
+        fi
+        
+        # 密码输入 (使用 -s 隐藏输入)
+        read -s -p "请输入密码 (Enter password): " NEW_PASS
+        echo ""
+        read -s -p "请再次输入密码 (Confirm password): " NEW_PASS_CONFIRM
+        echo ""
+
+        if [ "$NEW_PASS" == "$NEW_PASS_CONFIRM" ] && [ ! -z "$NEW_PASS" ]; then
+            break
+        else
+            echo -e "${RED}密码不匹配或为空，请重试。${NC}"
+        fi
+    done
+fi
 
 echo -e "${GREEN}>>> 凭据已记录。脚本将自动运行，您可以去喝杯咖啡了 ☕。${NC}"
 sleep 2

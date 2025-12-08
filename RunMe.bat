@@ -1,69 +1,46 @@
 @echo off
-setlocal EnableDelayedExpansion
-title WSL自动安装向导 (AutoSetup_WSL Launcher)
+:: 设置控制台为 UTF-8 编码，支持 emoji 和中文
+chcp 65001 > nul
+setlocal
 
-:: ==============================
-:: 配置区域
-:: ==============================
-set "TargetScript=AutoSetup_WSL.ps1"
+:: -------------------------------------------------------------
+:: 1. 管理员权限检测与自动提权模块
+:: -------------------------------------------------------------
+:: 尝试执行一个只有管理员才能执行的命令 (net session)
+net session >nul 2>&1
 
-:: ==============================
-:: 1. 环境准备与路径修正
-:: ==============================
-:: 强制切换到 bat 文件所在的目录 (解决管理员模式下默认路径为 System32 的问题)
-cd /d "%~dp0"
-
-:: ==============================
-:: 2. 检查管理员权限
-:: ==============================
-:: 使用 fsutil dirty query 检查权限 (比 cacls 更快更干净)
->nul 2>&1 fsutil dirty query %systemdrive%
-
-if '%errorlevel%' NEQ '0' (
-    echo [INFO] 当前非管理员权限，正在尝试提权...
-    echo [INFO] 请在弹出的 UAC 窗口中点击“是”...
-    
-    :: 重新启动自己，并申请 RunAs (管理员) 权限
-    :: 传递原始参数 (虽然 WSL 安装通常不需要参数，但保留此功能以备扩展)
-    powershell -Command "Start-Process -FilePath '%~f0' -ArgumentList '%*' -Verb RunAs"
-    
-    :: 提权后旧窗口退出
+:: 如果错误码(errorlevel)不为 0，说明没有管理员权限
+if %errorlevel% neq 0 (
+    echo 正在请求管理员权限... 🛡️
+    :: 使用 PowerShell 的 Start-Process -Verb RunAs 重新运行当前 bat 脚本
+    powershell -Command "Start-Process cmd -ArgumentList '/c, \"%~f0\"' -Verb RunAs"
     exit /b
 )
 
-:: ==============================
-:: 3. 执行前检查 (鲁棒性核心)
-:: ==============================
-echo [INFO] 已获得管理员权限.
-echo [INFO] 工作目录: "%~dp0"
+:: -------------------------------------------------------------
+:: 2. 环境准备
+:: -------------------------------------------------------------
+:: 关键步骤：切换工作目录到脚本当前所在的文件夹
+:: 如果不加这一行，提权后默认目录会变成 C:\Windows\System32，导致找不到 ps1 文件
+cd /d "%~dp0"
 
-if not exist ".\%TargetScript%" (
+echo 提权成功! ✅ 这是一只猫：🐈
+echo.
+
+:: 定义你的 PowerShell 脚本文件名 (如果名字不同，请在这里修改)
+set "SCRIPT_NAME=auto_install_wsl.ps1"
+
+:: -------------------------------------------------------------
+:: 3. 执行 PowerShell 脚本
+:: -------------------------------------------------------------
+if exist "%SCRIPT_NAME%" (
+    echo 正在调用 PowerShell 脚本监控安装...
     echo.
-    echo [ERROR] 致命错误: 找不到脚本文件!
-    echo [ERROR] 请确保 "%TargetScript%" 位于当前文件夹中:
-    echo         "%~dp0"
-    echo.
+    :: -ExecutionPolicy Bypass: 临时绕过执行策略，防止脚本被禁止运行
+    :: -File: 指定要运行的文件
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_NAME%"
+) else (
+    echo ❌ 错误：找不到文件 "%SCRIPT_NAME%"
+    echo 请确保 bat 和 ps1 文件在同一个目录下！
     pause
-    exit /b 1
 )
-
-:: ==============================
-:: 4. 启动 PowerShell 脚本
-:: ==============================
-echo [INFO] 正在启动 %TargetScript% ...
-echo -----------------------------------------------------------
-
-:: 关键参数解释:
-:: -NoProfile: 不加载用户配置文件 (加快启动速度，避免环境干扰)
-:: -ExecutionPolicy Bypass: 临时绕过脚本执行策略 (不修改系统全局设置)
-:: -File: 明确指定运行文件，防止路径解析错误
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\%TargetScript%"
-
-:: ==============================
-:: 5. 结束处理
-:: ==============================
-echo.
-echo -----------------------------------------------------------
-echo [INFO] 脚本执行结束.
-echo.
-pause
