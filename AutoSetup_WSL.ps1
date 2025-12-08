@@ -2,6 +2,13 @@
 # Windows WSL + Arch Linux 全自动部署脚本
 # ==========================================
 
+# 1. 强制管理员权限 (必须放在最前面，否则 DISM 命令无法执行)
+if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Host "请右键本脚本 -> 以管理员身份运行！" -ForegroundColor Red
+    Read-Host "按 Enter 键退出..."
+    Exit
+}
+
 # 颜色定义
 $Green = "Green"
 $Cyan = "Cyan"
@@ -10,7 +17,7 @@ $Red = "Red"
 
 Write-Host "=== Arch Linux on WSL 自动化部署工具 ===" -ForegroundColor $Cyan
 
-# 1. 检查并开启 Windows 功能 (WSL & 虚拟机平台)
+# 2. [恢复] 检查并开启 Windows 功能 (WSL & 虚拟机平台)
 Write-Host "`n[1/4] 检查 Windows 基础功能..." -ForegroundColor $Green
 
 $wslStatus = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
@@ -34,59 +41,41 @@ if ($wslStatus.State -ne "Enabled" -or $vmStatus.State -ne "Enabled") {
     Write-Host ">>> Windows 功能已就绪。" -ForegroundColor $Green
 }
 
-# 2. 更新 WSL 内核并设置默认版本为 2
+# 3. 更新 WSL 内核并设置默认版本为 2
 Write-Host "`n[2/4] 配置 WSL 版本..." -ForegroundColor $Green
 Write-Host ">>> 更新 WSL 内核..."
-wsl --update
+# 捕获可能的更新错误（防止网络问题中断脚本）
+try { wsl --update } catch { Write-Host "更新跳过或失败，尝试继续..." -ForegroundColor Gray }
 Write-Host ">>> 设置 WSL 2 为默认版本..."
 wsl --set-default-version 2
 
-# 3. 自动下载并安装 ArchWSL (使用 Yuk7 版本)
-$installPath = "$env:USERPROFILE\ArchWSL"
-$zipUrl = "https://github.com/yuk7/ArchWSL/releases/latest/download/Arch.zip"
-$zipPath = "$installPath\Arch.zip"
+# 4. [修改] 使用微软官方命令安装 Arch
+Write-Host "`n[3/4] 正在安装 Arch Linux..." -ForegroundColor $Green
 
-if (Test-Path "$installPath\Arch.exe") {
-    Write-Host "`n[3/4] 检测到 Arch 似乎已经安装在 $installPath" -ForegroundColor $Yellow
-    Write-Host ">>> 跳过下载安装步骤。"
+# 检查是否已经存在
+if (wsl --list --quiet | Select-String "Arch") {
+    Write-Host ">>> 检测到 Arch 似乎已经安装。" -ForegroundColor $Yellow
 } else {
-    Write-Host "`n[3/4] 正在下载安装 Arch Linux (Yuk7/ArchWSL)..." -ForegroundColor $Green
-    
-    # 创建安装目录
-    if (-not (Test-Path $installPath)) { New-Item -ItemType Directory -Force -Path $installPath | Out-Null }
-    
-    # 下载
-    Write-Host ">>> 正在下载 Arch.zip (可能需要一点时间)..." -ForegroundColor $Cyan
+    Write-Host ">>> 正在执行 wsl --install -d Arch ..." -ForegroundColor $Cyan
     try {
-        Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing
+        wsl --install -d archlinux
     } catch {
-        Write-Host "下载失败！请检查网络连接（GitHub 可能被墙）。" -ForegroundColor $Red
-        Pause
-        exit
+        Write-Host "安装命令报错！" -ForegroundColor $Red
+        Read-Host "按 Enter 键退出查看错误..."
+        Exit
     }
-
-    # 解压
-    Write-Host ">>> 正在解压..." -ForegroundColor $Cyan
-    Expand-Archive -Path $zipPath -DestinationPath $installPath -Force
-    
-    # 清理压缩包
-    Remove-Item $zipPath
-    
-    # 注册安装
-    Write-Host ">>> 正在初始化 Arch (注册到 WSL)..." -ForegroundColor $Cyan
-    Start-Process -FilePath "$installPath\Arch.exe" -Wait
-    
-    Write-Host ">>> Arch 安装完成！" -ForegroundColor $Green
 }
 
-# 4. 引导用户运行 Linux 内部脚本
+# 5. 引导用户运行 Linux 内部脚本
 Write-Host "`n[4/4] 准备就绪！" -ForegroundColor $Green
 Write-Host "--------------------------------------------------------" -ForegroundColor $Cyan
 Write-Host "Arch Linux 终端即将打开。" -ForegroundColor $Cyan
-Write-Host "请在打开的黑色窗口中，粘贴你的一键神咒：" -ForegroundColor $Yellow
+Write-Host "请在打开的窗口出现 [root@...] 后，粘贴你的一键神咒：" -ForegroundColor $Yellow
 Write-Host "--------------------------------------------------------"
-# 这里把你的神咒打印出来方便复制，注意替换成你的真实 URL
-$godCommand = "pacman -Sy --noconfirm curl && bash <(curl -sL https://gist.githubusercontent.com/iris-Neko/99588898da3e930d727a4398477433f6/raw/setup.sh)"
+
+# 你的原版神咒 (既然官方包自带 Keyring 配置，这里用回你原来的命令)
+$godCommand = "pacman -Sy --noconfirm curl && bash <(curl -sL https://raw.githubusercontent.com/iris-Neko/Arch-WSL-One-Click/refs/heads/main/git_setup.sh)"
+
 Write-Host $godCommand -ForegroundColor White -BackgroundColor DarkBlue
 Write-Host "--------------------------------------------------------"
 Set-Clipboard -Value $godCommand
@@ -95,5 +84,10 @@ Write-Host "(已自动复制到剪贴板，直接在 Arch 窗口里点右键粘�
 Write-Host "`n按任意键启动 Arch..."
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
-# 启动 Arch
-& "$installPath\Arch.exe"
+# 启动 Arch (尝试用 wsl 命令启动，比调用 exe 更通用)
+wsl -d archlinux
+
+# 防止窗口一闪而过
+Write-Host "`n=========================="
+Write-Host "脚本运行结束。"
+Read-Host -Prompt "按 Enter 键退出..."
