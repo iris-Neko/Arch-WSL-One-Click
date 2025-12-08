@@ -28,7 +28,7 @@ pacman -Syyu --noconfirm
 
 # 3. 安装基础软件 (Nano, Tmux, Git, Base-devel)
 echo -e "${GREEN}>>> Installing essentials (base-devel, git, zsh, nano, tmux, wget)...${NC}"
-pacman -S --noconfirm base-devel git zsh nano tmux wget curl unzip openssh man-db man-pages net-tools
+pacman -S --noconfirm base-devel git zsh nano tmux wget curl unzip openssh man-db man-pages net-tools fastfetch
 
 export EDITOR=nano
 
@@ -93,6 +93,11 @@ sed -i "s/^plugins=(git)/plugins=(z git zsh-autosuggestions zsh-syntax-highlight
 if ! grep -q "export EDITOR=" "$HOME/.zshrc"; then
     echo "" >> "$HOME/.zshrc"
     echo "export EDITOR=nano" >> "$HOME/.zshrc"
+fi
+if ! grep -q "fastfetch" "$HOME/.zshrc"; then
+    echo "" >> "$HOME/.zshrc"
+    echo "# Start fastfetch on terminal launch" >> "$HOME/.zshrc"
+    echo "fastfetch" >> "$HOME/.zshrc"
 fi
 '
 
