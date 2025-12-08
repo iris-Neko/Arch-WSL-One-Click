@@ -1,9 +1,8 @@
 #!/bin/bash
 
 # ==========================================
-# Arch Linux WSL 自动化初始化脚本
-# Author: Iris-Neko
-# GitHub: https://github.com/iris-Neko
+# Arch Linux WSL 自动化初始化脚本 (优化版)
+# Author: Iris-Neko (Modified)
 # ==========================================
 
 # 颜色定义
@@ -20,44 +19,104 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+# ==========================================
+# 0. 提前获取用户输入 (Early Input)
+# ==========================================
+echo -e "${BLUE}>>> Pre-configuration: Setup User Credentials${NC}"
+echo "为了实现自动化安装，请先设置将要创建的用户名和密码。"
+
+while true; do
+    read -p "请输入用户名 (Enter username): " NEW_USER
+    if [[ -z "$NEW_USER" ]]; then
+        echo -e "${RED}用户名不能为空，请重试。${NC}"
+        continue
+    fi
+    
+    if id "$NEW_USER" &>/dev/null; then
+        echo -e "${RED}用户 $NEW_USER 已存在。脚本将跳过创建，但为了安全请确认你已知晓密码。${NC}"
+        break
+    fi
+    
+    # 密码输入 (使用 -s 隐藏输入)
+    read -s -p "请输入密码 (Enter password): " NEW_PASS
+    echo ""
+    read -s -p "请再次输入密码 (Confirm password): " NEW_PASS_CONFIRM
+    echo ""
+
+    if [ "$NEW_PASS" == "$NEW_PASS_CONFIRM" ] && [ ! -z "$NEW_PASS" ]; then
+        break
+    else
+        echo -e "${RED}密码不匹配或为空，请重试。${NC}"
+    fi
+done
+
+echo -e "${GREEN}>>> 凭据已记录。脚本将自动运行，您可以去喝杯咖啡了 ☕。${NC}"
+sleep 2
+
+# ==========================================
+# 开始自动化流程
+# ==========================================
+
 # 2. 初始化 Pacman 并更新
 echo -e "${GREEN}>>> Initializing Pacman keys & Updating system...${NC}"
 pacman-key --init
 pacman-key --populate archlinux
 pacman -Syyu --noconfirm
 
-# 3. 安装基础软件 (Nano, Tmux, Git, Base-devel)
+# 3. 安装基础软件
 echo -e "${GREEN}>>> Installing essentials (base-devel, git, zsh, nano, tmux, wget)...${NC}"
 pacman -S --noconfirm base-devel git zsh nano tmux wget curl unzip openssh man-db man-pages net-tools fastfetch
 
 export EDITOR=nano
 
-# 4. 创建用户
+# 4. 创建用户 (使用之前获取的变量)
 echo -e "${BLUE}------------------------------------------------${NC}"
-echo -e "${BLUE}Creating a non-root user for daily use.${NC}"
-read -p "Enter username: " NEW_USER
+echo -e "${BLUE}Creating user $NEW_USER...${NC}"
 
 if id "$NEW_USER" &>/dev/null; then
-    echo -e "${RED}User $NEW_USER exists. Skipping creation.${NC}"
+    echo -e "${BLUE}User $NEW_USER already exists. Skipping creation.${NC}"
 else
+    # 创建用户
     useradd -m -G wheel -s /bin/zsh "$NEW_USER"
-    echo -e "${GREEN}>>> Set password for $NEW_USER:${NC}"
-    passwd "$NEW_USER"
     
-    # 配置 Sudo
+    # 非交互式设置密码
+    echo "$NEW_USER:$NEW_PASS" | chpasswd
+    echo -e "${GREEN}>>> Password set for $NEW_USER successfully.${NC}"
+    
+    # 配置 Sudo (允许 wheel 组使用 sudo)
     if [ ! -f /etc/sudoers ]; then touch /etc/sudoers; fi
     sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
     echo -e "${GREEN}>>> User $NEW_USER created and added to wheel group.${NC}"
 fi
 
-# 5. 配置 WSL 默认登录用户
-echo -e "${GREEN}>>> Setting WSL default user to $NEW_USER...${NC}"
-if [ ! -f /etc/wsl.conf ]; then touch /etc/wsl.conf; fi
-if grep -q "\[user\]" /etc/wsl.conf; then
-    sed -i "s/default=.*/default=$NEW_USER/" /etc/wsl.conf
+# 5. 配置 WSL 默认登录用户 AND 开启 Systemd
+echo -e "${GREEN}>>> Configuring WSL settings (Default User & Systemd)...${NC}"
+WSL_CONF="/etc/wsl.conf"
+if [ ! -f "$WSL_CONF" ]; then touch "$WSL_CONF"; fi
+
+# --- 5a. 设置默认用户 ---
+if grep -q "\[user\]" "$WSL_CONF"; then
+    sed -i "s/default=.*/default=$NEW_USER/" "$WSL_CONF"
 else
-    echo -e "\n[user]\ndefault=$NEW_USER" >> /etc/wsl.conf
+    echo -e "\n[user]\ndefault=$NEW_USER" >> "$WSL_CONF"
 fi
+
+# --- 5b. 开启 Systemd ---
+# 检查是否已有 [boot] 字段
+if grep -q "\[boot\]" "$WSL_CONF"; then
+    # 如果有 systemd 配置，则强制改为 true
+    if grep -q "systemd=" "$WSL_CONF"; then
+        sed -i "s/systemd=.*/systemd=true/" "$WSL_CONF"
+    else
+        # 如果有 [boot] 但没有 systemd 行，在 [boot] 下面添加
+        sed -i "/\[boot\]/a systemd=true" "$WSL_CONF"
+    fi
+else
+    # 如果完全没有 [boot] 字段，直接追加
+    echo -e "\n[boot]\nsystemd=true" >> "$WSL_CONF"
+fi
+
+echo -e "${GREEN}>>> WSL configuration updated (User: $NEW_USER, Systemd: Enabled).${NC}"
 
 # ==========================================
 # Switch to User context for AUR & Dotfiles
@@ -68,8 +127,8 @@ echo -e "${BLUE}>>> Switching to $NEW_USER for environment setup...${NC}"
 # 6. Oh My Zsh
 su - "$NEW_USER" -c '
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
-    echo ">>> [User] Installing Oh My Zsh..."
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+  echo ">>> [User] Installing Oh My Zsh..."
+  sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 fi
 '
 
@@ -77,12 +136,12 @@ fi
 su - "$NEW_USER" -c '
 ZSH_CUSTOM="$HOME/.oh-my-zsh/custom"
 if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
-    echo ">>> [User] Installing zsh-autosuggestions..."
-    git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM}/plugins/zsh-autosuggestions
+  echo ">>> [User] Installing zsh-autosuggestions..."
+  git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM}/plugins/zsh-autosuggestions
 fi
 if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]; then
-    echo ">>> [User] Installing zsh-syntax-highlighting..."
-    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM}/plugins/zsh-syntax-highlighting
+  echo ">>> [User] Installing zsh-syntax-highlighting..."
+  git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM}/plugins/zsh-syntax-highlighting
 fi
 '
 
@@ -91,42 +150,45 @@ su - "$NEW_USER" -c '
 echo ">>> [User] Configuring .zshrc..."
 sed -i "s/^plugins=(git)/plugins=(z git zsh-autosuggestions zsh-syntax-highlighting)/" "$HOME/.zshrc"
 if ! grep -q "export EDITOR=" "$HOME/.zshrc"; then
-    echo "" >> "$HOME/.zshrc"
-    echo "export EDITOR=nano" >> "$HOME/.zshrc"
+  echo "" >> "$HOME/.zshrc"
+  echo "export EDITOR=nano" >> "$HOME/.zshrc"
 fi
 if ! grep -q "fastfetch" "$HOME/.zshrc"; then
-    echo "" >> "$HOME/.zshrc"
-    echo "# Start fastfetch on terminal launch" >> "$HOME/.zshrc"
-    echo "fastfetch" >> "$HOME/.zshrc"
+  echo "" >> "$HOME/.zshrc"
+  echo "# Start fastfetch on terminal launch" >> "$HOME/.zshrc"
+  echo "fastfetch" >> "$HOME/.zshrc"
 fi
 '
 
 # 9. Compile & Install Yay (AUR Helper)
 su - "$NEW_USER" -c '
 if ! command -v yay &> /dev/null; then
-    echo ">>> [User] Installing yay (AUR Helper)..."
-    cd "$HOME"
-    mkdir -p tmp_yay_build && cd tmp_yay_build
-    git clone https://aur.archlinux.org/yay.git
-    cd yay
-    makepkg -si --noconfirm
-    cd "$HOME"
-    rm -rf tmp_yay_build
+  echo ">>> [User] Installing yay (AUR Helper)..."
+  cd "$HOME"
+  # 清理旧的构建目录以防万一
+  rm -rf tmp_yay_build
+  mkdir -p tmp_yay_build && cd tmp_yay_build
+  git clone https://aur.archlinux.org/yay.git
+  cd yay
+  makepkg -si --noconfirm
+  cd "$HOME"
+  rm -rf tmp_yay_build
 fi
 '
 
 # 10. Install Miniconda
 su - "$NEW_USER" -c '
 if [ ! -d "$HOME/miniconda3" ]; then
-    echo ">>> [User] Installing Miniconda..."
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh
-    bash ~/miniconda.sh -b -p "$HOME/miniconda3"
-    rm ~/miniconda.sh
-    "$HOME/miniconda3/bin/conda" init zsh
-    "$HOME/miniconda3/bin/conda" config --set auto_activate_base false
+  echo ">>> [User] Installing Miniconda..."
+  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh
+  bash ~/miniconda.sh -b -p "$HOME/miniconda3"
+  rm ~/miniconda.sh
+  "$HOME/miniconda3/bin/conda" init zsh
+  "$HOME/miniconda3/bin/conda" config --set auto_activate_base false
 fi
 '
 
 echo -e "${BLUE}==============================================${NC}"
-echo -e "${GREEN}🎉 Setup Complete! Please run: wsl --shutdown${NC}"
+echo -e "${GREEN}🎉 Setup Complete! Please run the following in PowerShell:${NC}"
+echo -e "${RED}wsl --shutdown${NC}"
 echo -e "${BLUE}==============================================${NC}"
