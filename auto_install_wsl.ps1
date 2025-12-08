@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     WSL ArchLinux 自动化安装脚本 (非阻塞监测版)
     
@@ -64,42 +64,38 @@ function Monitor-Installation {
     <#
     .DESCRIPTION
         核心监测逻辑：
-        不等待进程结束（因为会进Shell），而是监测 wsl --list --quiet 是否出现 Arch。
+        监测 wsl --list --quiet 是否出现 Arch。
+        已移除进程等待逻辑。
     #>
-    # 如果你的调用脚本仍会传入参数，请保留下面这一行，否则可以删除
-    # param([System.Diagnostics.Process]$InstallProcess)
+    # 1. 这里原本的 param(...) 已经被删除了，函数不需要接收参数了
 
     Write-Log "正在后台监测安装进度 (目标: Arch)..." "Cyan"
     
-    $maxRetries = 6000 # 约 200-300 分钟超时
+    $maxRetries = 6000 
     $counter = 0
     $spinner = @("|", "/", "-", "\")
     
     while ($counter -lt $maxRetries) {
         Start-Sleep -Seconds 2
         
-        # 1. 核心检测：检查 wsl 列表
-        
-        # === 编码处理开始 ===
-        # 保存当前的控制台编码，防止影响后续脚本
+        # === 编码处理开始 (确保 wsl 输出识别为 UTF8) ===
         $originalEncoding = [Console]::OutputEncoding
-        
-        # 临时将控制台输出编码强制设为 UTF-8，以保证 wsl 输出被正确捕获
         [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
         
         # 获取列表
         $listOutput = (wsl --list --quiet 2>$null) -join " "
         
-        # 恢复原有编码
+        # 恢复编码
         [Console]::OutputEncoding = $originalEncoding
         # === 编码处理结束 ===
         
+        # 核心检测：只要匹配到 Arch 就成功
         if ($listOutput -match "Arch") {
             Write-Host "`r" # 清除动画
             return "Success"
         }
 
-        # (已删除 2. 进程状态检测 功能)
+        # 2. 原本这里的 if ($InstallProcess.HasExited) 代码块已被删除
 
         # 动画效果
         Write-Host "`r[$($spinner[$counter % 4])] 等待 Arch 注册中..." -NoNewline -ForegroundColor DarkGray
@@ -188,11 +184,9 @@ function Main {
 
     # --- 启动安装 (独立窗口) ---
     Write-Log "启动新窗口运行: wsl --install -d archlinux" "Cyan"
-    # 关键：使用 PassThru 获取进程对象，用于判断窗口是否意外关闭
-    $proc = Start-Process wsl -ArgumentList "--install -d archlinux" -WindowStyle Normal -PassThru
+   
 
-    # --- 开始非阻塞监测 ---
-    $result = Monitor-Installation -InstallProcess $proc
+    $result = Monitor-Installation
 
     # --- 结果处理 ---
     if ($result -eq "Success") {
@@ -210,19 +204,7 @@ function Main {
             & $Script:AutoSetupFile
         }
     }
-    elseif ($result -eq "ProcessExited") {
-        if ($isFirstTime) {
-            Write-Log "安装程序已退出（可能是完成了组件下载并提示重启）。" "Yellow"
-            Write-Log "已配置自动启动，请重启电脑以完成剩余步骤。" "Yellow"
-            $choice = Read-Host "是否立即重启? (y/n)"
-            if ($choice -eq 'y') { Restart-Computer }
-        } else {
-            Write-Log "安装窗口已关闭，但未检测到 Arch 注册。可能安装失败或用户取消。" "Red"
-        }
-    }
-    else {
-        Write-Log "等待超时。请检查安装窗口是否有报错。" "Red"
-    }
+    
 }
 
 # 运行入口
