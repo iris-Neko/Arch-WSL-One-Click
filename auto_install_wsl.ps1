@@ -65,9 +65,9 @@ function Monitor-Installation {
     .DESCRIPTION
         核心监测逻辑：
         不等待进程结束（因为会进Shell），而是监测 wsl --list --quiet 是否出现 Arch。
-        同时监测进程是否意外退出。
     #>
-    param([System.Diagnostics.Process]$InstallProcess)
+    # 如果你的调用脚本仍会传入参数，请保留下面这一行，否则可以删除
+    # param([System.Diagnostics.Process]$InstallProcess)
 
     Write-Log "正在后台监测安装进度 (目标: Arch)..." "Cyan"
     
@@ -79,21 +79,27 @@ function Monitor-Installation {
         Start-Sleep -Seconds 2
         
         # 1. 核心检测：检查 wsl 列表
-        # 使用 --quiet 避免编码干扰，PowerShell 会处理为 UTF-16LE -> String
+        
+        # === 编码处理开始 ===
+        # 保存当前的控制台编码，防止影响后续脚本
+        $originalEncoding = [Console]::OutputEncoding
+        
+        # 临时将控制台输出编码强制设为 UTF-8，以保证 wsl 输出被正确捕获
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        
+        # 获取列表
         $listOutput = (wsl --list --quiet 2>$null) -join " "
+        
+        # 恢复原有编码
+        [Console]::OutputEncoding = $originalEncoding
+        # === 编码处理结束 ===
         
         if ($listOutput -match "Arch") {
             Write-Host "`r" # 清除动画
             return "Success"
         }
 
-        # 2. 进程状态检测 (针对首次安装需要重启的情况)
-        # 如果安装窗口已经关了，但列表里还没 Arch，说明可能是要求重启的阶段
-        if ($InstallProcess.HasExited) {
-            Write-Host "`r"
-            Write-Log "安装窗口已关闭。" "Yellow"
-            return "ProcessExited"
-        }
+        # (已删除 2. 进程状态检测 功能)
 
         # 动画效果
         Write-Host "`r[$($spinner[$counter % 4])] 等待 Arch 注册中..." -NoNewline -ForegroundColor DarkGray
