@@ -53,7 +53,7 @@
 *当黑色的 Arch 终端窗口弹出后，复制粘贴下方这行命令并回车：*
 
 ```bash
-pacman -Sy --noconfirm curl && bash <(curl -sL [https://raw.githubusercontent.com/iris-Neko/YOUR_REPO_NAME/main/setup.sh](https://raw.githubusercontent.com/iris-Neko/YOUR_REPO_NAME/main/setup.sh))
+pacman -Sy --noconfirm curl && bash <(curl -sL https://raw.githubusercontent.com/iris-Neko/Arch-WSL-One-Click/main/setup.sh)
 ```
 
 ## 📦 包含组件一览
@@ -78,8 +78,8 @@ pacman -Sy --noconfirm curl && bash <(curl -sL [https://raw.githubusercontent.co
 2.  **安装 ArchWSL**：从 [GitHub](https://github.com/yuk7/ArchWSL) 下载安装包。
 3.  **克隆仓库**：进入 Arch 后执行：
     ```bash
-    git clone [https://github.com/iris-Neko/YOUR_REPO_NAME.git](https://github.com/iris-Neko/YOUR_REPO_NAME.git)
-    cd YOUR_REPO_NAME
+    git clone https://github.com/iris-Neko/Arch-WSL-One-Click.git
+    cd Arch-WSL-One-Click
     chmod +x setup.sh
     sudo ./setup.sh
     ```

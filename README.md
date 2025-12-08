@@ -53,9 +53,9 @@ This repository provides a complete **Infrastructure as Code (IaC)** solution fo
 *Once your black Arch terminal window opens, run this single command to set up everything:*
 
 ```bash
-pacman -Sy --noconfirm curl && bash <(curl -sL [https://raw.githubusercontent.com/iris-Neko/YOUR_REPO_NAME/main/setup.sh](https://raw.githubusercontent.com/iris-Neko/YOUR_REPO_NAME/main/setup.sh))
+pacman -Sy --noconfirm curl && bash <(curl -sL https://raw.githubusercontent.com/iris-Neko/Arch-WSL-One-Click/main/setup.sh)
+```
 
-```markdown
 ## 📦 What's Inside?
 
 | Component | Status | Details |
@@ -78,8 +78,8 @@ If you prefer to do things manually or modify the scripts:
 2.  **Install ArchWSL** from [GitHub](https://github.com/yuk7/ArchWSL).
 3.  **Clone this repo** inside Arch:
     ```bash
-    git clone [https://github.com/iris-Neko/YOUR_REPO_NAME.git](https://github.com/iris-Neko/YOUR_REPO_NAME.git)
-    cd YOUR_REPO_NAME
+    git clone https://github.com/iris-Neko/Arch-WSL-One-Click.git
+    cd Arch-WSL-One-Click
     chmod +x setup.sh
     sudo ./setup.sh
     ```
