@@ -43,26 +43,6 @@ function Clean-RunOnceRegistry {
     }
 }
 
-function Init-Arch-Keyring {
-    <#
-    .DESCRIPTION
-        初始化 Pacman Keyring，解决签名错误问题。
-    #>
-    Write-Log "正在初始化 Arch Keyring (这可能需要几分钟)..." "Cyan"
-    
-    # 组合命令：初始化 -> 填充 -> 刷新(可选，这里只做基础填充)
-    # 注意：这里使用 root 用户运行
-    $cmd = "pacman-key --init && pacman-key --populate archlinux"
-    
-    wsl -d archlinux -u root -- exec bash -c $cmd
-    
-    if ($LASTEXITCODE -eq 0) {
-        Write-Log "Keyring 初始化完成。" "Green"
-    } else {
-        Write-Log "Keyring 初始化遇到错误，请检查网络或稍后手动尝试。" "Red"
-    }
-}
-
 function Invoke-SetupShellScript {
     <#
     .DESCRIPTION
@@ -114,16 +94,7 @@ function Main {
 
     # 1. 清理痕迹
     Clean-RunOnceRegistry
-
-    # 2. 确保 WSL 处于活跃状态 (防止刚重启 WSL 未响应)
-    Write-Log "正在连接 WSL 子系统..." "Gray"
-    wsl -d archlinux -u root -- exec echo "WSL Ready" | Out-Null
-
-    # 3. 初始化密钥环
-    Init-Arch-Keyring
-
-    # 4. 执行 setup.sh
-    Invoke-SetupShellScript -WinPath $Script:SetupShellFile
+    Invoke-SetupShellScript
 
     Write-Log "=== 所有配置脚本执行完毕 ===" "Green"
     Write-Log "现在您可以安全关闭此窗口。" "Gray"

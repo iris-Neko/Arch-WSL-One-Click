@@ -84,18 +84,18 @@ function Monitor-Installation {
         
         # 获取列表
         $listOutput = (wsl --list --quiet 2>$null) -join " "
+        $listOutput = $listOutput -replace "\0", ""
         
         # 恢复编码
         [Console]::OutputEncoding = $originalEncoding
         # === 编码处理结束 ===
-        
+
         # 核心检测：只要匹配到 Arch 就成功
-        if ($listOutput -match "Arch") {
+        if ($listOutput.Trim() -like "*arch*") {
             Write-Host "`r" # 清除动画
             return "Success"
         }
 
-        # 2. 原本这里的 if ($InstallProcess.HasExited) 代码块已被删除
 
         # 动画效果
         Write-Host "`r[$($spinner[$counter % 4])] 等待 Arch 注册中..." -NoNewline -ForegroundColor DarkGray
@@ -171,7 +171,9 @@ function Main {
     if ($isFirstTime) {
         Write-Log "模式: [首次安装] - 系统未检测到 WSL 组件" "Magenta"
         Write-Log "即将注册重启任务..." "Gray"
+  
         Register-RunOnce -ScriptPath $Script:AutoSetupFile
+        Start-Process wsl -ArgumentList "--install -d archlinux" -Verb RunAs
     } else {
         Write-Log "模式: [增量安装] - WSL 组件已就绪" "Magenta"
         # 如果已经有 Arch 了，直接跳去运行 Setup
@@ -180,6 +182,7 @@ function Main {
             & $Script:AutoSetupFile
             return
         }
+        Start-Process wsl -ArgumentList "--install -d archlinux" -Verb RunAs
     }
 
     # --- 启动安装 (独立窗口) ---
@@ -204,7 +207,7 @@ function Main {
             & $Script:AutoSetupFile
         }
     }
-    
+
 }
 
 # 运行入口
