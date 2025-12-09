@@ -29,6 +29,7 @@ echo -e "${BLUE}>>> Pre-configuration: Setup User Credentials${NC}"
 CRED_FILE="$(pwd)/wsl_cred.txt"
 AUTO_LOAD_SUCCESS=false
 
+
 # 可选：打印一下当前在哪个目录找文件，方便调试
 echo -e "${BLUE}Searching for credentials in: $CRED_FILE${NC}"
 
