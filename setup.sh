@@ -24,10 +24,13 @@ fi
 
 echo -e "${BLUE}>>> Pre-configuration: Setup User Credentials${NC}"
 
-# --- 尝试 1: 从文件自动读取 (PowerShell 生成) ---
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-CRED_FILE="$SCRIPT_DIR/wsl_cred.txt"
+# --- 尝试 1: 从当前工作目录自动读取 ---
+# 修改点：直接指向当前路径下的 wsl_cred.txt
+CRED_FILE="$(pwd)/wsl_cred.txt"
 AUTO_LOAD_SUCCESS=false
+
+# 可选：打印一下当前在哪个目录找文件，方便调试
+echo -e "${BLUE}Searching for credentials in: $CRED_FILE${NC}"
 
 if [ -f "$CRED_FILE" ]; then
     echo -e "${BLUE}检测到自动配置文件，正在解析...${NC}"
@@ -50,6 +53,9 @@ if [ -f "$CRED_FILE" ]; then
     else
         echo -e "${RED}配置文件格式无效，转为手动输入模式。${NC}"
     fi
+else
+    # 增加一个提示，告诉用户没找到文件
+    echo -e "${YELLOW}未在当前目录找到 wsl_cred.txt，将使用手动输入模式。${NC}"
 fi
 
 # --- 尝试 2: 交互式输入 (如果自动读取未成功) ---
