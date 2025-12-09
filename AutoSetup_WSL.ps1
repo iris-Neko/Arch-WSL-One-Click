@@ -44,11 +44,6 @@ function Clean-RunOnceRegistry {
 }
 
 function Invoke-SetupShellScript {
-    <#
-    .DESCRIPTION
-        在 WSL 内部执行 Windows 目录下的 setup.sh。
-        自动处理：路径转换、CRLF 换行符修复、权限赋予。
-    #>
     param([string]$WinPath)
 
     if (-not (Test-Path $WinPath)) {
@@ -58,31 +53,24 @@ function Invoke-SetupShellScript {
 
     Write-Log "准备执行脚本: setup.sh" "Cyan"
 
-    # 构建复杂的 Bash 命令字符串
-    # 1. wslpath: 把 Windows 路径转为 /mnt/c/...
-    # 2. sed: 去除 \r 字符 (CRLF -> LF)，防止 '/bin/bash^M: bad interpreter' 错误
-    # 3. chmod: 赋予执行权限
-    # 4. bash: 执行脚本
-    
-    # 注意：这里使用单引号包裹 Windows 路径，防止特殊字符问题
     $bashScript = @"
-    echo '>>> [WSL] 正在定位文件...'
-    LINUX_PATH=`$(wslpath '$WinPath')
-    echo "Target: `$LINUX_PATH"
+echo '>>> [WSL] 正在定位文件...'
+LINUX_PATH=\$(wslpath '$WinPath')
+echo "Target: \$LINUX_PATH"
 
-    echo '>>> [WSL] 正在修复换行符 (CRLF fix)...'
-    sed -i 's/\r$//' "`$LINUX_PATH"
+echo '>>> [WSL] 正在修复换行符 (CRLF fix)...'
+sed -i 's/\r$//' "\$LINUX_PATH"
 
-    echo '>>> [WSL] 赋予执行权限...'
-    chmod +x "`$LINUX_PATH"
+echo '>>> [WSL] 赋予执行权限...'
+chmod +x "\$LINUX_PATH"
 
-    echo '>>> [WSL] 开始执行 setup.sh ...'
-    echo '----------------------------------------'
-    bash "`$LINUX_PATH"
+echo '>>> [WSL] 开始执行 setup.sh ...'
+echo '----------------------------------------'
+bash "\$LINUX_PATH"
 "@
 
-    # 执行命令
-    wsl -d archlinux -u root -- exec bash -c $bashScript
+    # 必须双引号包裹，否则 PowerShell 会误解析多行字符串
+    wsl -d archlinux -u root -- bash -c "$bashScript"
 }
 
 # ==========================================
@@ -94,7 +82,9 @@ function Main {
 
     # 1. 清理痕迹
     Clean-RunOnceRegistry
-    Invoke-SetupShellScript
+
+    # 2. 执行 setup.sh
+    Invoke-SetupShellScript $Script:SetupShellFile
 
     Write-Log "=== 所有配置脚本执行完毕 ===" "Green"
     Write-Log "现在您可以安全关闭此窗口。" "Gray"
