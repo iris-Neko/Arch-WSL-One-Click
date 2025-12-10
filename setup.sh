@@ -130,6 +130,7 @@ else
 fi
 
 # 5. 配置 WSL 默认登录用户 AND 开启 Systemd
+echo "配置 WSL 默认登录用户 AND 开启 Systemd"
 echo -e "${GREEN}>>> Configuring WSL settings (Default User & Systemd)...${NC}"
 WSL_CONF="/etc/wsl.conf"
 if [ ! -f "$WSL_CONF" ]; then touch "$WSL_CONF"; fi
@@ -201,21 +202,31 @@ fi
 '
 
 # 9. Compile & Install Yay (AUR Helper)
-su - "$NEW_USER" -c '
+YAY_INSTALL_SCRIPT='
 if ! command -v yay &> /dev/null; then
   echo ">>> [User] Installing yay (AUR Helper)..."
   cd "$HOME"
-  # 清理旧的构建目录以防万一
+  
+  # 清理旧目录
   rm -rf tmp_yay_build
   mkdir -p tmp_yay_build && cd tmp_yay_build
   git clone https://aur.archlinux.org/yay.git
   cd yay
+  
+  # 使用传入的环境变量 NEW_PASS
+  echo "pass=$NEW_PASS"
+  echo "$NEW_PASS" | sudo -S -v
+  
+  # 开始构建
   makepkg -si --noconfirm
+  
   cd "$HOME"
   rm -rf tmp_yay_build
 fi
 '
 
+su - "$NEW_USER" -c "export NEW_PASS='$NEW_PASS'; $YAY_INSTALL_SCRIPT"
+sleep 10
 # 10. Install Miniconda
 su - "$NEW_USER" -c '
 if [ ! -d "$HOME/miniconda3" ]; then
