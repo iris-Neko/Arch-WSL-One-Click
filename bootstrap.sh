@@ -31,7 +31,7 @@ if [ ! -d "/etc/pacman.d/gnupg" ]; then
     pacman-key --populate archlinux
 fi
 
-echo -e "${GREEN}>>> 步骤 2/3: 安装 Python...${NC}"
+echo -e "${GREEN}>>> 步骤 2/4: 安装 Python...${NC}"
 if ! command -v python3 &> /dev/null; then
     pacman -Sy --noconfirm python
     echo -e "${GREEN}Python 安装完成！${NC}"
@@ -39,7 +39,40 @@ else
     echo -e "${BLUE}Python 已安装，跳过...${NC}"
 fi
 
-echo -e "${GREEN}>>> 步骤 3/3: 启动 Python 安装程序...${NC}"
+echo -e "${GREEN}>>> 步骤 3/4: 安装 PyYAML (配置文件支持)...${NC}"
+if ! python3 -c "import yaml" &> /dev/null; then
+    pacman -S --noconfirm python-yaml
+    echo -e "${GREEN}PyYAML 安装完成！${NC}"
+else
+    echo -e "${BLUE}PyYAML 已安装，跳过...${NC}"
+fi
+
+echo -e "${GREEN}>>> 步骤 4/5: 检查配置文件...${NC}"
+CONFIG_FILE="$SCRIPT_DIR/setup.yaml"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo -e "${YELLOW}配置文件不存在，正在生成...${NC}"
+    
+    # 检查是否有中国配置模板
+    if [ -f "$SCRIPT_DIR/setup-china.yaml" ]; then
+        echo -e "${BLUE}检测到中国优化配置，是否使用？(y/n) [推荐]${NC}"
+        read -p "选择: " choice
+        if [ "$choice" = "y" ] || [ "$choice" = "Y" ] || [ -z "$choice" ]; then
+            cp "$SCRIPT_DIR/setup-china.yaml" "$CONFIG_FILE"
+            echo -e "${GREEN}✓ 已使用中国优化配置${NC}"
+        else
+            cp "$SCRIPT_DIR/setup.yaml.example" "$CONFIG_FILE"
+            echo -e "${GREEN}✓ 已使用通用配置${NC}"
+        fi
+    else
+        cp "$SCRIPT_DIR/setup.yaml.example" "$CONFIG_FILE"
+        echo -e "${GREEN}✓ 已生成配置文件${NC}"
+    fi
+    
+    echo -e "${YELLOW}提示: 可以编辑 setup.yaml 自定义配置${NC}"
+    echo ""
+fi
+
+echo -e "${GREEN}>>> 步骤 5/5: 启动 Python 安装程序...${NC}"
 echo ""
 
 # 检查 Python 脚本是否存在

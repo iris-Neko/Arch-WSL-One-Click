@@ -1,0 +1,174 @@
+# Arch Linux WSL 自动化配置工具 - 配置文件示例
+# 将此文件重命名为 setup.yaml 即可生效
+# 未配置的项将使用默认值
+
+# ==========================================
+# 包列表配置
+# ==========================================
+
+# 基础包（强烈推荐）
+PKG_BASE:
+  - base-devel
+  - git
+  - zsh
+  - nano
+  - vim
+  - tmux
+  - wget
+  - curl
+  - unzip
+  - openssh
+  - man-db
+  - net-tools
+  - fastfetch
+  - sudo
+
+# 可选包（根据需求调整）
+PKG_OPT:
+  - htop
+  - neofetch
+  - tree
+  - fzf
+  - ripgrep
+  - bat
+  - exa
+
+# GitHub CLI
+PKG_GH:
+  - github-cli
+
+# ==========================================
+# 系统路径配置
+# ==========================================
+
+WSL_CONF: /etc/wsl.conf
+SUDOERS: /etc/sudoers
+LOG_FILE: /var/log/arch_wsl_setup.log
+
+# ==========================================
+# 重试机制配置
+# ==========================================
+
+# 网络操作重试次数
+RETRY_TIMES: 3
+
+# 重试间隔（秒）
+RETRY_DELAY: 2
+
+# ==========================================
+# 网络配置
+# ==========================================
+
+# 代理设置（留空表示不使用代理）
+# 示例: "http://127.0.0.1:7890" 或 "socks5://127.0.0.1:1080"
+PROXY: ""
+
+# 网络连通性检查
+NETWORK_CHECK_HOST: archlinux.org
+NETWORK_CHECK_PORT: 80
+NETWORK_CHECK_TIMEOUT: 5
+
+# ==========================================
+# 镜像源配置（中国用户推荐启用）
+# ==========================================
+
+# 是否启用中国镜像源（true/false）
+# 启用后会自动配置国内镜像，大幅提升下载速度
+ENABLE_CHINA_MIRRORS: false
+
+# 中国镜像源列表（按优先级排序）
+CHINA_MIRRORS:
+  - https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch      # 清华大学
+  - https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch                # 中国科技大学
+  - https://mirrors.aliyun.com/archlinux/$repo/os/$arch                 # 阿里云
+  - https://mirrors.163.com/archlinux/$repo/os/$arch                    # 网易
+  - https://repo.huaweicloud.com/archlinux/$repo/os/$arch               # 华为云
+  # 可根据地区添加更多镜像:
+  # - https://mirrors.nju.edu.cn/archlinux/$repo/os/$arch               # 南京大学
+  # - https://mirrors.zju.edu.cn/archlinux/$repo/os/$arch               # 浙江大学
+
+# ==========================================
+# 下载 URL 配置
+# ==========================================
+
+# Oh My Zsh 安装脚本
+OMZ_URL: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
+
+# Miniconda 下载链接
+CONDA_URL: https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+
+# Yay AUR 助手仓库
+YAY_REPO: https://aur.archlinux.org/yay.git
+
+# ==========================================
+# Zsh 插件配置
+# ==========================================
+
+ZSH_PLUGINS:
+  zsh-autosuggestions: https://github.com/zsh-users/zsh-autosuggestions
+  zsh-syntax-highlighting: https://github.com/zsh-users/zsh-syntax-highlighting.git
+  # 可添加更多插件，例如：
+  # zsh-completions: https://github.com/zsh-users/zsh-completions
+
+# ==========================================
+# 配置说明
+# ==========================================
+
+# 1. 包管理
+#    - PKG_BASE: 必备包，安装失败会提示但继续
+#    - PKG_OPT: 可选包，失败不影响主流程
+#    - PKG_GH: GitHub CLI，用于 gh auth login
+
+# 2. 重试机制
+#    - RETRY_TIMES: 建议 2-5 次，避免过长等待
+#    - RETRY_DELAY: 建议 1-5 秒，根据网络状况调整
+
+# 3. URL 配置
+#    - 可替换为国内镜像以加速下载
+#    - 清华镜像示例：
+#      CONDA_URL: https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-latest-Linux-x86_64.sh
+
+# 4. 插件管理
+#    - 格式：插件名: Git 仓库 URL
+#    - 所有插件并发安装以节省时间
+#    - 失败的插件会自动清理
+
+# 5. 镜像源配置（中国用户）
+#    - 启用后自动配置国内镜像源
+#    - 原始 mirrorlist 会自动备份
+#    - 可自定义镜像列表和优先级
+#    - 推荐清华/科大/阿里云镜像
+
+# ==========================================
+# 使用方法
+# ==========================================
+
+# 1. 重命名文件
+#    mv setup.yaml.example setup.yaml
+
+# 2. 编辑配置（中国用户推荐启用镜像源）
+#    nano setup.yaml
+#    # 修改: ENABLE_CHINA_MIRRORS: true
+
+# 3. 运行脚本
+#    sudo python3 arch_wsl_setup.py
+
+# 4. 生成最新配置模板
+#    sudo python3 arch_wsl_setup.py --gen-config
+
+# ==========================================
+# 中国用户快速配置
+# ==========================================
+
+# 1. 启用镜像源（提升下载速度）
+#    ENABLE_CHINA_MIRRORS: true
+
+# 2. 配置代理（可选，如果使用代理）
+#    PROXY: "http://127.0.0.1:7890"
+
+# 3. 使用国内 Conda 镜像
+#    CONDA_URL: https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-latest-Linux-x86_64.sh
+
+# 4. 调整网络检查为国内服务器
+#    NETWORK_CHECK_HOST: mirrors.tuna.tsinghua.edu.cn
+
